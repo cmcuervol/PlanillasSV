@@ -7,6 +7,7 @@ import pandas as pd
 import datetime as dt
 
 import xlwt
+import xlsxwriter
 from Utils import Listador
 
 Year_Eval = 2020
@@ -91,7 +92,7 @@ def SplitPartidas(DF, Partidas=Positions, Dimensiones=dimensions,):
 
             df =  DF.iloc[idx]
             df.insert(0, 'Dimension',Dim, True )
-            df.insert(1, 'Parámetro',Par, True )
+            df.insert(1, 'Parametro',Par, True )
 
             if len(split) == 0:
                 split = df
@@ -99,6 +100,7 @@ def SplitPartidas(DF, Partidas=Positions, Dimensiones=dimensions,):
                 split.append(df)
 
     return split
+
 
 S = pd.DataFrame([])
 for i in range(len(Empresas)):
@@ -111,27 +113,71 @@ for i in range(len(Empresas)):
         if len(Split) != 0:
             if len(company) == 0:
                 company = Split
-            else: company.append(Split, ignore_index=True)
+            else:
+                company = company.append(Split, ignore_index=True)
     print(Empresas[i])
     if len(company) != 0:
-        print('check')
         if len(S) == 0:
             S = company
-            print('Initialized')
         else:
-            S.append(company, ignore_index=True)
-            print('Hello')
+            S = S.append(company, ignore_index=True)
 
 
+Info  = S
 
 
+header = ['Dimension','NIT','Parámetro','año','Subpartida arancelaria','I (Importación)','E (Exportación)','Fabricación Nacional','No de declaración de exportación','Fecha','Número de unidades importadas','Número de unidades exportadas','Número de unidades Fabricadas en Colombia','Peso bruto en kilogramos importados','Peso bruto en kilogramos exportados','Peso bruto en kilogramos de unidades Fabricadas en Colombia']
 
+workbook  = xlsxwriter.Workbook('test.xlsx')
+worksheet = workbook.add_worksheet()
 
+date_format = workbook.add_format({'num_format': 'd mmmm yyyy'})
+head_format = workbook.add_format()
+head_format.set_align('center')
+head_format.set_align('vcenter')
+head_format.set_bold(True)
+head_format.set_text_wrap()
+# bold = workbook.add_format({'bold': True})
 
+worksheet.set_row(0,111)
+worksheet.set_column(0,0,  15.17)
+worksheet.set_column(1,1,  10.67)
+worksheet.set_column(2,2,  36.50)
+worksheet.set_column(3,3,   6.33)
+worksheet.set_column(4,4,  27.00)
+worksheet.set_column(5,8,  18.50)
+worksheet.set_column('J:J',11.00)
+worksheet.set_column('K:K',20.17)
+worksheet.set_column('L:N',15.17)
+worksheet.set_column('O:P',14.17)
 
+# for column, heading in enumerate(header):
+#     worksheet.write(0, column, heading, bold)
+worksheet.write_row(0,0, header, head_format)
 
+worksheet.write_column(1,0, Info['Dimension'].values)
+worksheet.write_column(1,1, Info['NIT']      .values)
+worksheet.write_column(1,2, Info['Parámetro'].values)
+worksheet.write_column(1,3, Info['ANIO']     .values)
+worksheet.write_column(1,4, Info['PARTIDA']  .values)
+worksheet.write_column(1,10,Info['cantidad'] .values.astype(float).astype(int))
+worksheet.write_column(1,13,Info['peso neto'].values)
 
+worksheet.write_column(1,5, ['x']*len(Info))
+worksheet.write_column(1,11,[0]*len(Info))
+worksheet.write_column(1,12,[0]*len(Info))
+worksheet.write_column(1,14,[0]*len(Info))
+worksheet.write_column(1,15,[0]*len(Info))
 
+for i in range(Info.shape[0]):
+    fecha = dt.datetime(Info['ANIO'].values[i], Info['MES'].values[i], Info['DIA'].values[i])
+    worksheet.write_datetime(i+1, 9,fecha,date_format)
+    try:
+        worksheet.write_number(i+1,8,int(Info['numero de manifiesto'].values[i]))
+    except:
+        worksheet.write_string(i+1,8,'')
+
+workbook.close()
 
 def AnlgWriter(P, DatesAnlg, YearsAnlg, BeginDate, EndDate, PlantNames, SheetNames, FileName):
     """
