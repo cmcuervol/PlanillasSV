@@ -14,13 +14,6 @@ Year_Eval = 2020
 
 Path = os.getcwd()
 
-Path_data = os.path.join(Path, 'BACEX')
-
-Empresas = Listador(Path_data)
-
-if  '.DS_Store' in Empresas:
-    Empresas.remove('.DS_Store')
-
 Positions = {'Llantas Automóvil'                             :401110,
              'Llantas Camión'                                :401120,
              'Llantas Moto'                                  :401140,
@@ -72,12 +65,15 @@ def start_with(ID, List):
     """
     return [i for i in range(len(List)) if str(List[i]).startswith(str(ID))]
 
-def SplitPartidas(DF, Partidas=Positions, Dimensiones=dimensions,):
+def SplitPartidas(DF, Year_Eval=Year_Eval, Partidas=Positions, Dimensiones=dimensions,):
     """
     Split BACEX DataFrame
     INPUTS
-    indexes : List or array with indexes
-    ids     : List of ids to search
+    DF         : DataFrame with the readed data from BACEX database
+    Year_Eval  : year of the evaluation
+    Partidas   : dictionary with the inital numbers of arancelary partidas
+    Dimensiones: dictionary with the number of dimensions asociated with partida
+
     """
 
     split = pd.DataFrame([])
@@ -101,121 +97,107 @@ def SplitPartidas(DF, Partidas=Positions, Dimensiones=dimensions,):
 
     return split
 
-
-S = pd.DataFrame([])
-for i in range(len(Empresas)):
-    Path_empresa = os.path.join(Path_data,Empresas[i])
-    archivos = Listador(Path_empresa)
-    company= pd.DataFrame([])
-    for j in range(len(archivos)):
-        Data = pd.read_excel(os.path.join(Path_empresa,archivos[j]))
-        Split = SplitPartidas(DF=Data[['ANIO', 'MES', 'DIA', 'PARTIDA', 'NIT','cantidad', 'peso neto', 'numero de manifiesto',]])
-        if len(Split) != 0:
-            if len(company) == 0:
-                company = Split
-            else:
-                company = company.append(Split, ignore_index=True)
-    print(Empresas[i])
-    if len(company) != 0:
-        if len(S) == 0:
-            S = company
-        else:
-            S = S.append(company, ignore_index=True)
-
-
-Info  = S
-
-
-header = ['Dimension','NIT','Parámetro','año','Subpartida arancelaria','I (Importación)','E (Exportación)','Fabricación Nacional','No de declaración de exportación','Fecha','Número de unidades importadas','Número de unidades exportadas','Número de unidades Fabricadas en Colombia','Peso bruto en kilogramos importados','Peso bruto en kilogramos exportados','Peso bruto en kilogramos de unidades Fabricadas en Colombia']
-
-workbook  = xlsxwriter.Workbook('test.xlsx')
-worksheet = workbook.add_worksheet()
-
-date_format = workbook.add_format({'num_format': 'd mmmm yyyy'})
-head_format = workbook.add_format()
-head_format.set_align('center')
-head_format.set_align('vcenter')
-head_format.set_bold(True)
-head_format.set_text_wrap()
-# bold = workbook.add_format({'bold': True})
-
-worksheet.set_row(0,111)
-worksheet.set_column(0,0,  15.17)
-worksheet.set_column(1,1,  10.67)
-worksheet.set_column(2,2,  36.50)
-worksheet.set_column(3,3,   6.33)
-worksheet.set_column(4,4,  27.00)
-worksheet.set_column(5,8,  18.50)
-worksheet.set_column('J:J',11.00)
-worksheet.set_column('K:K',20.17)
-worksheet.set_column('L:N',15.17)
-worksheet.set_column('O:P',14.17)
-
-# for column, heading in enumerate(header):
-#     worksheet.write(0, column, heading, bold)
-worksheet.write_row(0,0, header, head_format)
-
-worksheet.write_column(1,0, Info['Dimension'].values)
-worksheet.write_column(1,1, Info['NIT']      .values)
-worksheet.write_column(1,2, Info['Parámetro'].values)
-worksheet.write_column(1,3, Info['ANIO']     .values)
-worksheet.write_column(1,4, Info['PARTIDA']  .values)
-worksheet.write_column(1,10,Info['cantidad'] .values.astype(float).astype(int))
-worksheet.write_column(1,13,Info['peso neto'].values)
-
-worksheet.write_column(1,5, ['x']*len(Info))
-worksheet.write_column(1,11,[0]*len(Info))
-worksheet.write_column(1,12,[0]*len(Info))
-worksheet.write_column(1,14,[0]*len(Info))
-worksheet.write_column(1,15,[0]*len(Info))
-
-for i in range(Info.shape[0]):
-    fecha = dt.datetime(Info['ANIO'].values[i], Info['MES'].values[i], Info['DIA'].values[i])
-    worksheet.write_datetime(i+1, 9,fecha,date_format)
-    try:
-        worksheet.write_number(i+1,8,int(Info['numero de manifiesto'].values[i]))
-    except:
-        worksheet.write_string(i+1,8,'')
-
-workbook.close()
-
-def AnlgWriter(P, DatesAnlg, YearsAnlg, BeginDate, EndDate, PlantNames, SheetNames, FileName):
+def DataIEF(Year_Eval=Year_Eval, Partidas=Positions, Dimensiones=dimensions, Path=Path ):
     """
-    Write file to flexibility analysis
+    get IEF data
     INPUTS
-    P          : Array with forecast plant power  with dimensions [time, plants, scenario]
-    DatesAnlg  : Array wit the indexes of each analogue years for each escenario,
-    YearsAnlg  : list of year of the analogue
-    BeginDate  : Initial date, to sort the results of the analogues
-    EndDate    : End date, to sort the results of the analogues
-    PlantNames : lis or array with the names of the plant
-    SheetNames : names of the scenarios to write in each sheet
-    FileName   : name of the file to save
+    Year_Eval  : year of the evaluation
+    Partidas   : dictionary with the inital numbers of arancelary partidas
+    Dimensiones: dictionary with the number of dimensions asociated with partida
+    Path       : absolute path to search the data
     """
+    Path_data = os.path.join(Path, 'BACEX')
+    Empresas = Listador(Path_data)
 
-    dates = datetimer(BeginDate, EndDate, 1)
+    if  '.DS_Store' in Empresas:
+        Empresas.remove('.DS_Store')
 
-    wb = xlwt.Workbook()
-    for s in range(len(SheetNames)):
-        sheet = wb.add_sheet(SheetNames[s])  # Crear hoja decálculo
-        sheet.write(0, 0, 'Fecha')
+    S = pd.DataFrame([])
+    for i in range(len(Empresas)):
+        Path_empresa = os.path.join(Path_data,Empresas[i])
+        archivos = Listador(Path_empresa)
+        company= pd.DataFrame([])
+        for j in range(len(archivos)):
+            Data = pd.read_excel(os.path.join(Path_empresa,archivos[j]))
+            Split = SplitPartidas(DF=Data[['ANIO', 'MES', 'DIA', 'PARTIDA', 'NIT','cantidad', 'peso neto', 'numero de manifiesto',]],
+                                  Year_Eval=Year_Eval,
+                                  Partidas=Partidas,
+                                  Dimensiones=Dimensiones)
+            if len(Split) != 0:
+                if len(company) == 0:
+                    company = Split
+                else:
+                    company = company.append(Split, ignore_index=True)
+        print(Empresas[i])
+        if len(company) != 0:
+            if len(S) == 0:
+                S = company
+            else:
+                S = S.append(company, ignore_index=True)
+    return S
 
-        for column, heading in enumerate(PlantNames, 1):
-            sheet.write(0, column, str(heading))
 
-        for i in range(P.shape[0]):
-            sheet.write(i+1, 0, dates[i].strftime('%Y-%m-%d %H:00:00'))
-            m = dates[i].month
-            d = dates[i].day
-            h = dates[i].hour
-            try:
-                # idx = np.where(DatesAnlg[s]==f'{YearsAnlg[s]}-{m}-{d} {h}:00:00')[0][0]
-                idx = np.where(DatesAnlg[s]==pd.Timestamp(YearsAnlg[s],m,d,h))[0][0]
-            except:
-                # february 29th
-                # idx = np.where(DatesAnlg[s]==f'{YearsAnlg[s]}-{m}-{d-1} {h}:00:00')[0][0]
-                idx = np.where(DatesAnlg[s]==pd.Timestamp(YearsAnlg[s],m,d-1,h))[0][0]
 
-            for j in range(P.shape[1]):
-                sheet.write(i+1, j+1, P[idx,j,s])
-    wb.save(FileName)
+def WriteIEF(Info, nameFile='PlantillaInformacionIEF.xlsx', Path=Path):
+    """
+    Write planilla IEF
+    INPUTS
+    Info     : DataFrame with the information
+    nameFile : Name to save excell workbook
+    Path     : Absolute path to save file
+    """
+    header = ['Dimension','NIT','Parámetro','año','Subpartida arancelaria','I (Importación)','E (Exportación)','Fabricación Nacional','No de declaración de exportación','Fecha','Número de unidades importadas','Número de unidades exportadas','Número de unidades Fabricadas en Colombia','Peso bruto en kilogramos importados','Peso bruto en kilogramos exportados','Peso bruto en kilogramos de unidades Fabricadas en Colombia']
+
+    workbook  = xlsxwriter.Workbook(os.path.join(Path,nameFile))
+    worksheet = workbook.add_worksheet('Información Importaciones Ll')
+
+    date_format = workbook.add_format({'num_format': 'd mmmm yyyy'})
+    head_format = workbook.add_format()
+    head_format.set_align('center')
+    head_format.set_align('vcenter')
+    head_format.set_bold(True)
+    head_format.set_text_wrap()
+    # bold = workbook.add_format({'bold': True})
+
+    worksheet.set_row(0,111)
+    worksheet.set_column(0,0,  15.17)
+    worksheet.set_column(1,1,  10.67)
+    worksheet.set_column(2,2,  36.50)
+    worksheet.set_column(3,3,   6.33)
+    worksheet.set_column(4,4,  27.00)
+    worksheet.set_column(5,8,  18.50)
+    worksheet.set_column('J:J',11.00)
+    worksheet.set_column('K:K',20.17)
+    worksheet.set_column('L:N',15.17)
+    worksheet.set_column('O:P',14.17)
+
+    # for column, heading in enumerate(header):
+    #     worksheet.write(0, column, heading, bold)
+    worksheet.write_row(0,0, header, head_format)
+
+    worksheet.write_column(1,0, Info['Dimension'].values)
+    worksheet.write_column(1,1, Info['NIT']      .values)
+    worksheet.write_column(1,2, Info['Parametro'].values)
+    worksheet.write_column(1,3, Info['ANIO']     .values)
+    worksheet.write_column(1,4, Info['PARTIDA']  .values)
+    worksheet.write_column(1,10,Info['cantidad'] .values.astype(float).astype(int))
+    worksheet.write_column(1,13,Info['peso neto'].values)
+
+    worksheet.write_column(1,5, ['x']*len(Info))
+    worksheet.write_column(1,11,[ 0 ]*len(Info))
+    worksheet.write_column(1,12,[ 0 ]*len(Info))
+    worksheet.write_column(1,14,[ 0 ]*len(Info))
+    worksheet.write_column(1,15,[ 0 ]*len(Info))
+
+    for i in range(Info.shape[0]):
+        fecha = dt.datetime(Info['ANIO'].values[i], Info['MES'].values[i], Info['DIA'].values[i])
+        worksheet.write_datetime(i+1, 9,fecha,date_format)
+        try:
+            worksheet.write_number(i+1,8,int(Info['numero de manifiesto'].values[i]))
+        except:
+            worksheet.write_string(i+1,8,'')
+
+    workbook.close()
+
+Info  = DataIEF()
+WriteIEF(Info)
