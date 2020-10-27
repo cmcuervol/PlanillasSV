@@ -124,7 +124,11 @@ def SplitPartidas(DF, Year_Eval=Year_Eval, Partidas=Positions, Dimensiones=dimen
 
 def FixWeigthUnits(DF, weigth=Peso_relation, Units=Tire_units):
     """
-    Change
+    Change the weiths and units in the items related
+    INPUTS
+    DF     :   DataFrame with the data
+    weigth : dictionary to search te min weigth in a item class
+    units  : dictionary with te relation of units of tires per item
     """
     # uw = DF['peso neto'].values.astype(float)/DF['cantidad'].values.astype(float)
     # PesoUnit = {}
@@ -203,6 +207,9 @@ def DataIEF(Year_Eval=Year_Eval, Partidas=Positions, Dimensiones=dimensions, Pat
 
 def MetasIndividules(Info):
     """
+    Calculate the total goals  for each company
+    INPUTS
+    Info : DataFrame with the data consolidated for all companies
     """
     Compn = np.unique(Info['Empresa'].values)
     Metas = {}
@@ -228,6 +235,9 @@ def MetasIndividules(Info):
     return Metas
 def MetasTotales(Info):
     """
+    Calculate the total goals
+    INPUTS
+    Info : DataFrame with the data consolidated for all companies
     """
 
     dim  = Info['Dimension'].values
@@ -321,10 +331,10 @@ def WriteMetas(Meta_ind, Meta_total, nameFile='Metas.xlsx', Path=Path):
     header_tot = ['Dimension 1 [unidades]', 'Dimension 1 [kg]','Dimension 2 [unidades]', 'Dimension 2 [kg]']
 
     workbook  = xlsxwriter.Workbook(os.path.join(Path,nameFile))
-
-    date_format = workbook.add_format({'num_format': 'd mmmm yyyy'})
-    head_format = workbook.add_format()
-    head_format.set_align('center')
+    merge_format = workbook.add_format({'align': 'center'})
+    date_format  = workbook.add_format({'num_format': 'd mmmm yyyy'})
+    head_format  = workbook.add_format()
+    head_format.set_align('center')Ahhh
     head_format.set_align('vcenter')
     head_format.set_bold(True)
     head_format.set_text_wrap()
@@ -358,21 +368,3 @@ Meta_i = MetasIndividules(Info)
 Meta_t = MetasTotales(Info)
 
 WriteMetas(Meta_i,Meta_t)
-
-# idx = start_with(8704, Info.PARTIDA.values)
-# car =  np.unique(Info.iloc[idx].NIT)
-# Path_data = os.path.join(Path, 'BACEX')
-# Empresas = Listador(Path_data)
-#
-# if  '.DS_Store' in Empresas:
-#     Empresas.remove('.DS_Store')
-#
-#
-# for i in range(len(Empresas)):
-#     Path_empresa = os.path.join(Path_data,Empresas[i])
-#     archivos = Listador(Path_empresa)
-#     for j in range(len(archivos)):
-#         Data = pd.read_excel(os.path.join(Path_empresa,archivos[j]))
-#         if Data.NIT[0] in car:
-#             print (Empresas[i])
-#             continue
