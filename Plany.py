@@ -64,6 +64,15 @@ Peso_relation = {8702     :[401120],
                  8712     :[401150],
                  9801     :[401140],
                  }
+
+PesoUnit = {8702: 24.713224368499258,
+            8703: 5,
+            8704: 40,
+            8705: 50,
+            8711: 2.5,
+            8712: 0.7882352941176471,
+            9801: 2.5}
+
 Tire_units = {8702     :6,
               8703     :4,
               8704     :4 ,
@@ -122,7 +131,7 @@ def SplitPartidas(DF, Year_Eval=Year_Eval, Partidas=Positions, Dimensiones=dimen
 
     return split
 
-def FixWeigthUnits(DF, weigth=Peso_relation, Units=Tire_units):
+def FixWeigthUnits(DF, weigth=Peso_relation, PesoUnit=PesoUnit, Units=Tire_units):
     """
     Change the weiths and units in the items related
     INPUTS
@@ -139,13 +148,7 @@ def FixWeigthUnits(DF, weigth=Peso_relation, Units=Tire_units):
     #         idx = start_with(tires[j],DF.PARTIDA.values)
     #         Pmin.append(uw[idx].min())
     #     PesoUnit.update({list(weigth.keys())[i]: np.min(Pmin)})
-    PesoUnit = {8702: 24.713224368499258,
-                8703: 5,
-                8704: 40,
-                8705: 50,
-                8711: 2.5,
-                8712: 0.7882352941176471,
-                9801: 2.5}
+
     for i in range(len(Units)):
         idx = start_with(list(Units.keys())[i],DF.PARTIDA.values)
         if list(Units.keys())[i] != 8704:
@@ -205,6 +208,32 @@ def DataIEF(Year_Eval=Year_Eval, Partidas=Positions, Dimensiones=dimensions, Pat
     S = FixWeigthUnits(S)
     return S
 
+def ResumeInfo(Data):
+    """
+    Resume the data acumulate by partida, company and year
+    INPUTS
+    Data : DataFrame with total information
+    """
+    Res = pd.DataFrame([],columns=Data.columns)
+    Empresas = np.unique(Data.Empresa)
+    pbar = tqdm(total=len(Empresas), desc='Acumulando por partidas: ')
+    for Emp in Empresas:
+        Company = Data[Data.Empresa==Emp]
+        print(f'Empresa: {Emp}')
+        for y in np.unique(Company.ANIO):
+            Year = Company[Company.ANIO==y]
+            print(f'Year {y}')
+            for P in np.unique(Year.PARTIDA):
+                Part = Year[Year.PARTIDA==P]
+                Res = Res.append(Part.iloc[0])
+                Res['Fecha']    .iloc[-1] = dt.datetime(y,12,31)
+                Res['MES']      .iloc[-1] = 12
+                Res['DIA']      .iloc[-1] = 31
+                Res['cantidad'] .iloc[-1] = Part['cantidad'].sum()
+                Res['peso neto'].iloc[-1] = Part['peso neto'].sum()
+        pbar.update(1)
+    pbar.close()
+    return Res
 def MetasIndividules(Info):
     """
     Calculate the total goals  for each company
@@ -334,7 +363,7 @@ def WriteMetas(Meta_ind, Meta_total, nameFile='Metas.xlsx', Path=Path):
     merge_format = workbook.add_format({'align': 'center'})
     date_format  = workbook.add_format({'num_format': 'd mmmm yyyy'})
     head_format  = workbook.add_format()
-    head_format.set_align('center')Ahhh
+    head_format.set_align('center')
     head_format.set_align('vcenter')
     head_format.set_bold(True)
     head_format.set_text_wrap()
@@ -368,3 +397,5 @@ Meta_i = MetasIndividules(Info)
 Meta_t = MetasTotales(Info)
 
 WriteMetas(Meta_i,Meta_t)
+Resume = ResumeInfo(Info.copy())
+WriteIEF(Resume, nameFile='ResumenPlantillaInformacionIEF.xlsx')
