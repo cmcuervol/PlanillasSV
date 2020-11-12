@@ -219,10 +219,10 @@ def ResumeInfo(Data):
     pbar = tqdm(total=len(Empresas), desc='Acumulando por partidas: ')
     for Emp in Empresas:
         Company = Data[Data.Empresa==Emp]
-        print(f'Empresa: {Emp}')
+        # print(f'Empresa: {Emp}')
         for y in np.unique(Company.ANIO):
             Year = Company[Company.ANIO==y]
-            print(f'Year {y}')
+            # print(f'Year {y}')
             for P in np.unique(Year.PARTIDA):
                 Part = Year[Year.PARTIDA==P]
                 Res = Res.append(Part.iloc[0])
@@ -239,29 +239,47 @@ def MetasIndividules(Info):
     Calculate the total goals  for each company
     INPUTS
     Info : DataFrame with the data consolidated for all companies
+    OUTPUTS
+    Metas : Dictionary with thw folowing information
+    IMPORTACIONES 2018				IMPORTACIONES 2019				META
+    DIMENSIÓN 1		DIMENSIÓN 2		DIMENSIÓN 1		DIMENSIÓN 2		DIMENSIÓN 1		DIMENSIÓN 2
+    UNIDADES	KG	UNIDADES	KG	UNIDADES	KG	UNIDADES	KG	UNIDADES	KG	UNIDADES	KG
     """
-    Compn = np.unique(Info['Empresa'].values)
-    Metas = {}
-    for i in range(Compn.shape[0]):
-        idn  = np.where(Info['Empresa'].values == Compn[i])[0]
-        name = Info['Nombre'].iloc[idn[0]]
-        dim  = Info['Dimension'].iloc[idn].values
-        n_dim = np.unique(dim)
-        Meta1_p = 0
-        Meta1_u = 0
-        Meta2_p = 0
-        Meta2_u = 0
-        for j in n_dim:
-            idd = np.where(dim==j)[0]
-            if j == 1:
-                Meta1_u = 0.5*np.sum(Info['cantidad' ].iloc[idn[idd]]) * 0.25
-                Meta1_p = 0.5*np.sum(Info['peso neto'].iloc[idn[idd]]) * 0.25
-            if j == 2:
-                Meta2_u = 0.5*np.sum(Info['cantidad' ].iloc[idn[idd]]) * 0.60
-                Meta2_p = 0.5*np.sum(Info['peso neto'].iloc[idn[idd]]) * 0.60
 
-        Metas.update({name:[Meta1_u,Meta1_p,Meta2_u,Meta2_p]})
-    return Metas
+    Compn = np.unique(Info['Empresa'].values)
+    goal = np.zeros((Compn.shape[0],12), dtype=float)
+    Metas = []
+    for i in range(Compn.shape[0]):
+        idn   = np.where(Info['Empresa'].values == Compn[i])[0]
+        name  = Info['Nombre'].iloc[idn[0]]
+        NIT   = Info['NIT'].iloc[idn[0]]
+        dim   = Info['Dimension'].iloc[idn].values
+        years = Info['ANIO'].iloc[idn].values
+        ndim  = np.unique(dim)
+        nyear = np.unique(Info['ANIO'].iloc[idn].values)
+
+        Metas.append([name, NIT])
+        for d in ndim:
+            idd = np.where(dim==d)[0]
+            if d == 1:
+                goal[i,-4] = 0.5*np.sum(Info['cantidad' ].iloc[idn[idd]]) * 0.25
+                goal[i,-3] = 0.5*np.sum(Info['peso neto'].iloc[idn[idd]]) * 0.25
+            if d == 2:
+                goal[i,-2] = 0.5*np.sum(Info['cantidad' ].iloc[idn[idd]]) * 0.60
+                goal[i,-1] = 0.5*np.sum(Info['peso neto'].iloc[idn[idd]]) * 0.60
+
+            for j, y in enumerate(nyear):
+                idy = np.where(years[idd] == y)[0]
+                if d == 1:
+                    goal[i,4*j+0] = 0.5*np.sum(Info['cantidad' ].iloc[idn[idd[idy]]]) * 0.25
+                    goal[i,4*j+1] = 0.5*np.sum(Info['peso neto'].iloc[idn[idd[idy]]]) * 0.25
+                if d == 2:
+                    goal[i,4*j+2] = 0.5*np.sum(Info['cantidad' ].iloc[idn[idd[idy]]]) * 0.60
+                    goal[i,4*j+3] = 0.5*np.sum(Info['peso neto'].iloc[idn[idd[idy]]]) * 0.60
+    Metas = np.array(Metas)
+
+    return goal, Metas
+
 def MetasTotales(Info):
     """
     Calculate the total goals
@@ -343,24 +361,22 @@ def WriteIEF(Info, nameFile='PlantillaInformacionIEF.xlsx', Path=Path):
 
     workbook.close()
 
-def WriteMetas(Meta_ind, Meta_total, nameFile='Metas.xlsx', Path=Path):
+def WriteMetas(Vals_ind, NameNIT, Meta_total, nameFile='Metas.xlsx', Path=Path):
     """
     Write goals
     INPUTS
+    Vals_ind : array with values of metas for each company
+    NameNIT  : Name and NIT of each company
     Meta_ind : dictionary with goals per company ['Empresa','Dimension 1 [unidades]', 'Dimension 1 [kg]','Dimension 2 [unidades]', 'Dimension 2 [kg]']
     Meta_ind : List of goals of all companies ['Dimension 1 [unidades]', 'Dimension 1 [kg]','Dimension 2 [unidades]', 'Dimension 2 [kg]']
     nameFile : Name to save excell workbook
     Path     : Absolute path to save file
     """
-    Name_ind = list(Meta_ind.keys())
-    Vals_ind = np.array(list(Meta_ind.values()))
 
-
-    header_ind = ['Empresa','Dimension 1 [unidades]', 'Dimension 1 [kg]','Dimension 2 [unidades]', 'Dimension 2 [kg]']
     header_tot = ['Dimension 1 [unidades]', 'Dimension 1 [kg]','Dimension 2 [unidades]', 'Dimension 2 [kg]']
 
     workbook  = xlsxwriter.Workbook(os.path.join(Path,nameFile))
-    merge_format = workbook.add_format({'align': 'center'})
+    merge_format = workbook.add_format({'align': 'center','valign':'vcenter','bold':True})
     date_format  = workbook.add_format({'num_format': 'd mmmm yyyy'})
     head_format  = workbook.add_format()
     head_format.set_align('center')
@@ -370,15 +386,35 @@ def WriteMetas(Meta_ind, Meta_total, nameFile='Metas.xlsx', Path=Path):
     # bold = workbook.add_format({'bold': True})
 
     worksheet = workbook.add_worksheet('MetasIndividules')
-    worksheet.set_row(0,50)
+    # worksheet.set_row(0,50)
     worksheet.set_column(0,0,  100)
-    worksheet.set_column(1,4,  15)
+    worksheet.set_column(1,14,  15)
+
+    worksheet.merge_range('A1:A3', 'Empresa', merge_format)
+    worksheet.merge_range('B1:B3', 'NIT',     merge_format)
+
+    worksheet.merge_range('C1:F1', f'IMPORTACIONES {Year_Eval-2}', merge_format)
+    worksheet.merge_range('G1:J1', f'IMPORTACIONES {Year_Eval-1}', merge_format)
+    worksheet.merge_range('K1:N1', 'META', merge_format)
+
+    worksheet.merge_range('C2:D2', 'DIMENSION 1', merge_format)
+    worksheet.merge_range('E2:F2', 'DIMENSION 2', merge_format)
+    worksheet.merge_range('G2:H2', 'DIMENSION 1', merge_format)
+    worksheet.merge_range('I2:J2', 'DIMENSION 2', merge_format)
+    worksheet.merge_range('K2:L2', 'DIMENSION 1', merge_format)
+    worksheet.merge_range('M2:N2', 'DIMENSION 2', merge_format)
 
 
-    worksheet.write_row(0,0, header_ind, head_format)
-    worksheet.write_column(1,0, Name_ind)
+
+
+    worksheet.write_row(2,2, ['UNIDADES', 'KG']*6, head_format)
+    worksheet.write_column(3,0, NameNIT[:,0])
+    worksheet.write_column(3,1, NameNIT[:,1])
     for i in range(Vals_ind.shape[1]):
-        worksheet.write_column(1,i+1, Vals_ind[:,i])
+        worksheet.write_column(3,2+i, Vals_ind[:,i])
+
+
+
 
     sheet = workbook.add_worksheet('MetasTotales')
     sheet.set_row(0,50)
@@ -393,9 +429,10 @@ def WriteMetas(Meta_ind, Meta_total, nameFile='Metas.xlsx', Path=Path):
 
 Info  = DataIEF()
 WriteIEF(Info)
-Meta_i = MetasIndividules(Info)
+Goal, NameNIT = MetasIndividules(Info)
 Meta_t = MetasTotales(Info)
 
-WriteMetas(Meta_i,Meta_t)
+WriteMetas(Goal, NameNIT,Meta_t)
+
 Resume = ResumeInfo(Info.copy())
-WriteIEF(Resume, nameFile='ResumenPlantillaInformacionIEF.xlsx')
+WriteIEF(Resume, nameFile='ResumenPlantillaInformacionI EF.xlsx')
