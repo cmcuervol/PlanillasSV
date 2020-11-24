@@ -12,6 +12,9 @@ import random
 from Utils import Listador
 
 Year_Eval = 2020
+Desgaste  = 0.68
+Meta_dim1 = 0.20
+Meta_dim2 = 0.55
 
 Path = os.getcwd()
 
@@ -131,7 +134,7 @@ def SplitPartidas(DF, Year_Eval=Year_Eval, Partidas=Positions, Dimensiones=dimen
 
     return split
 
-def FixWeigthUnits(DF, weigth=Peso_relation, PesoUnit=PesoUnit, Units=Tire_units):
+def FixWeigthUnits(DF, weigth=Peso_relation, PesoUnit=PesoUnit, Units=Tire_units,Desgaste=Desgaste):
     """
     Change the weiths and units in the items related
     INPUTS
@@ -157,18 +160,19 @@ def FixWeigthUnits(DF, weigth=Peso_relation, PesoUnit=PesoUnit, Units=Tire_units
             DF['cantidad'].iloc[idx] = DF['cantidad'].iloc[idx].values * random.choices([6,10], weights=(80,20))[0]
 
         # DF['peso neto'].iloc[idx] = DF['cantidad'].iloc[idx] * PesoUnit[list(Units.keys())[i]] * Units[list(Units.keys())[i]]
-        DF['peso neto'].iloc[idx] = DF['cantidad'].iloc[idx] * PesoUnit[list(Units.keys())[i]]
+        DF['peso neto'].iloc[idx] = DF['cantidad'].iloc[idx] * PesoUnit[list(Units.keys())[i]] * Desgaste
 
     return DF
 
 
-def DataIEF(Year_Eval=Year_Eval, Partidas=Positions, Dimensiones=dimensions, Path=Path ):
+def DataIEF(Year_Eval=Year_Eval, Partidas=Positions, Dimensiones=dimensions, Desgaste=Desgaste, Path=Path ):
     """
     get IEF data
     INPUTS
     Year_Eval  : year of the evaluation
     Partidas   : dictionary with the inital numbers of arancelary partidas
     Dimensiones: dictionary with the number of dimensions asociated with partida
+    Desgaste   : factor to desgaste
     Path       : absolute path to search the data
     """
     Path_data = os.path.join(Path, 'BACEX')
@@ -187,6 +191,7 @@ def DataIEF(Year_Eval=Year_Eval, Partidas=Positions, Dimensiones=dimensions, Pat
             Data = pd.read_excel(os.path.join(Path_empresa,archivos[j]))
             Data.insert(0, 'Empresa',[i]*len(Data), True)
             Data.insert(0, 'Nombre',[Empresas[i]]*len(Data), True)
+            # Data['peso neto'] *= Desgaste
             Split = SplitPartidas(DF=Data[['Empresa', 'Nombre','ANIO', 'MES', 'DIA', 'PARTIDA', 'NIT','cantidad', 'peso neto',]],
                                   Year_Eval=Year_Eval,
                                   Partidas=Partidas,
@@ -204,8 +209,10 @@ def DataIEF(Year_Eval=Year_Eval, Partidas=Positions, Dimensiones=dimensions, Pat
                 S = S.append(company.sort_values(by=['Fecha']) , ignore_index=True)
         pbar.update(1)
     pbar.close()
+
     S['cantidad'] = S['cantidad'].values.astype(float).astype(int)
-    S = FixWeigthUnits(S)
+    S['peso neto'] *= Desgaste
+    S = FixWeigthUnits(S,Desgaste=Desgaste)
     return S
 
 def ResumeInfo(Data):
@@ -234,11 +241,13 @@ def ResumeInfo(Data):
         pbar.update(1)
     pbar.close()
     return Res
-def MetasIndividules(Info):
+def MetasIndividules(Info, Meta_dim1=Meta_dim1,Meta_dim2=Meta_dim2):
     """
     Calculate the total goals  for each company
     INPUTS
-    Info : DataFrame with the data consolidated for all companies
+    Info      : DataFrame with the data consolidated for all companies
+    Meta_dim1 : Factor of goal fo dimension 1
+    Meta_dim2 : Factor of goal fo dimension 2
     OUTPUTS
     Metas : Dictionary with thw folowing information
     IMPORTACIONES 2018				IMPORTACIONES 2019				META
@@ -262,29 +271,31 @@ def MetasIndividules(Info):
         for d in ndim:
             idd = np.where(dim==d)[0]
             if d == 1:
-                goal[i,-4] = 0.5*np.sum(Info['cantidad' ].iloc[idn[idd]]) * 0.25
-                goal[i,-3] = 0.5*np.sum(Info['peso neto'].iloc[idn[idd]]) * 0.25
+                goal[i,-4] = 0.5*np.sum(Info['cantidad' ].iloc[idn[idd]]) * Meta_dim1
+                goal[i,-3] = 0.5*np.sum(Info['peso neto'].iloc[idn[idd]]) * Meta_dim1
             if d == 2:
-                goal[i,-2] = 0.5*np.sum(Info['cantidad' ].iloc[idn[idd]]) * 0.60
-                goal[i,-1] = 0.5*np.sum(Info['peso neto'].iloc[idn[idd]]) * 0.60
+                goal[i,-2] = 0.5*np.sum(Info['cantidad' ].iloc[idn[idd]]) * Meta_dim2
+                goal[i,-1] = 0.5*np.sum(Info['peso neto'].iloc[idn[idd]]) * Meta_dim2
 
             for j, y in enumerate(nyear):
                 idy = np.where(years[idd] == y)[0]
                 if d == 1:
-                    goal[i,4*j+0] = 0.5*np.sum(Info['cantidad' ].iloc[idn[idd[idy]]]) * 0.25
-                    goal[i,4*j+1] = 0.5*np.sum(Info['peso neto'].iloc[idn[idd[idy]]]) * 0.25
+                    goal[i,4*j+0] = np.sum(Info['cantidad' ].iloc[idn[idd[idy]]])
+                    goal[i,4*j+1] = np.sum(Info['peso neto'].iloc[idn[idd[idy]]])
                 if d == 2:
-                    goal[i,4*j+2] = 0.5*np.sum(Info['cantidad' ].iloc[idn[idd[idy]]]) * 0.60
-                    goal[i,4*j+3] = 0.5*np.sum(Info['peso neto'].iloc[idn[idd[idy]]]) * 0.60
+                    goal[i,4*j+2] = np.sum(Info['cantidad' ].iloc[idn[idd[idy]]])
+                    goal[i,4*j+3] = np.sum(Info['peso neto'].iloc[idn[idd[idy]]])
     Metas = np.array(Metas)
 
     return goal, Metas
 
-def MetasTotales(Info):
+def MetasTotales(Info,Meta_dim1=Meta_dim1,Meta_dim2=Meta_dim2):
     """
     Calculate the total goals
     INPUTS
-    Info : DataFrame with the data consolidated for all companies
+    Info      : DataFrame with the data consolidated for all companies
+    Meta_dim1 : Factor of goal fo dimension 1
+    Meta_dim2 : Factor of goal fo dimension 2
     """
 
     dim  = Info['Dimension'].values
@@ -292,11 +303,11 @@ def MetasTotales(Info):
     for j in n_dim:
         idd = np.where(dim==j)[0]
         if j == 1:
-            Meta1_u = 0.5*np.sum(Info['cantidad' ].iloc[idd]) * 0.25
-            Meta1_p = 0.5*np.sum(Info['peso neto'].iloc[idd]) * 0.25
+            Meta1_u = 0.5*np.sum(Info['cantidad' ].iloc[idd]) * Meta_dim1
+            Meta1_p = 0.5*np.sum(Info['peso neto'].iloc[idd]) * Meta_dim1
         if j == 2:
-            Meta2_u = 0.5*np.sum(Info['cantidad' ].iloc[idd]) * 0.60
-            Meta2_p = 0.5*np.sum(Info['peso neto'].iloc[idd]) * 0.60
+            Meta2_u = 0.5*np.sum(Info['cantidad' ].iloc[idd]) * Meta_dim2
+            Meta2_p = 0.5*np.sum(Info['peso neto'].iloc[idd]) * Meta_dim2
 
     return [Meta1_u,Meta1_p,Meta2_u,Meta2_p]
 
@@ -435,4 +446,4 @@ Meta_t = MetasTotales(Info)
 WriteMetas(Goal, NameNIT,Meta_t)
 
 Resume = ResumeInfo(Info.copy())
-WriteIEF(Resume, nameFile='ResumenPlantillaInformacionI EF.xlsx')
+WriteIEF(Resume, nameFile='ResumenPlantillaInformacionIEF.xlsx')
