@@ -9,9 +9,8 @@ import datetime as dt
 from tqdm import tqdm
 import xlsxwriter
 import random
-from Utils import Listador
 
-Year_Eval = 2020
+Year_Eval = 2021
 Desgaste  = 0.68
 Meta_dim1 = 0.20
 Meta_dim2 = 0.55
@@ -84,6 +83,35 @@ Tire_units = {8702     :6,
               8712     :2,
               9801     :2,
               }
+
+def Listador(directorio, inicio=None, final=None):
+    """
+    Return the elements (files and directories) of any directory,
+    optionaly with filter by start o end of the name of the element
+    INPUTS
+    directorio : route of the directory
+    inicio     : start of the elements
+    final      : end of the elements
+    OUTPUTS
+    lf  : list of elements
+    """
+    lf = []
+    lista = os.listdir(directorio)
+    lista.sort()
+    if inicio == final == None:
+        return lista
+    else:
+        for i in lista:
+            if inicio == None:
+                if i.endswith(final):
+                    lf.append(i)
+            if final == None:
+                if i.startswith(inicio):
+                    lf.append(i)
+            if (inicio is not None) & (final is not None):
+                if i.startswith(inicio) & i.endswith(final):
+                    lf.append(i)
+        return lf
 
 
 def start_with(ID, List):
@@ -188,11 +216,13 @@ def DataIEF(Year_Eval=Year_Eval, Partidas=Positions, Dimensiones=dimensions, Des
         archivos = Listador(Path_empresa)
         company= pd.DataFrame([])
         for j in range(len(archivos)):
-            Data = pd.read_excel(os.path.join(Path_empresa,archivos[j]))
+            Data = pd.read_excel(os.path.join(Path_empresa,archivos[j]), engine='openpyxl',sheet_name='Detalle', header=2)
             Data.insert(0, 'Empresa',[i]*len(Data), True)
             Data.insert(0, 'Nombre',[Empresas[i]]*len(Data), True)
             # Data['peso neto'] *= Desgaste
-            Split = SplitPartidas(DF=Data[['Empresa', 'Nombre','ANIO', 'MES', 'DIA', 'PARTIDA', 'NIT','cantidad', 'peso neto',]],
+            df = Data[['Empresa', 'Nombre','Año', 'Mes', 'Dia', 'Código Partida', 'NIT del Importador (Análisis estadístico bajo modelo predictivo*)','Cantidad(es)', 'Peso en kilos netos',]]
+            df.columns = ['Empresa', 'Nombre','ANIO', 'MES', 'DIA', 'PARTIDA', 'NIT','cantidad', 'peso neto',]
+            Split = SplitPartidas(DF=df,
                                   Year_Eval=Year_Eval,
                                   Partidas=Partidas,
                                   Dimensiones=Dimensiones)
