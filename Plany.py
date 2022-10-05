@@ -10,7 +10,7 @@ from tqdm import tqdm
 import xlsxwriter
 import random
 
-Year_Eval = 2021
+Year_Eval = dt.datetime.now().year -1
 Desgaste  = 0.68
 Meta_dim1 = 0.20
 Meta_dim2 = 0.55
@@ -216,12 +216,20 @@ def DataIEF(Year_Eval=Year_Eval, Partidas=Positions, Dimensiones=dimensions, Des
         archivos = Listador(Path_empresa)
         company= pd.DataFrame([])
         for j in range(len(archivos)):
-            Data = pd.read_excel(os.path.join(Path_empresa,archivos[j]), engine='openpyxl',sheet_name='Detalle', header=2)
-            Data.insert(0, 'Empresa',[i]*len(Data), True)
-            Data.insert(0, 'Nombre',[Empresas[i]]*len(Data), True)
+            try:
+                Data = pd.read_excel(os.path.join(Path_empresa,archivos[j]),engine='openpyxl')
+                Data.insert(0, 'Empresa',[i]*len(Data), True)
+                Data.insert(0, 'Nombre',[Empresas[i]]*len(Data), True)
+                df = Data[['Empresa', 'Nombre','ANIO', 'MES', 'DIA', 'PARTIDA', 'NIT','cantidad', 'peso neto',]]
+            except:
+                Data = pd.read_excel(os.path.join(Path_empresa,archivos[j]),
+                                     engine='openpyxl',sheet_name='Detalle', header=2)
+                Data.insert(0, 'Empresa',[i]*len(Data), True)
+                Data.insert(0, 'Nombre',[Empresas[i]]*len(Data), True)
+                df = Data[['Empresa', 'Nombre','Año', 'Mes', 'Dia', 'Código Partida', 'NIT del Importador (Análisis estadístico bajo modelo predictivo*)','Cantidad(es)', 'Peso en kilos netos',]]
+                df.columns = ['Empresa', 'Nombre','ANIO', 'MES', 'DIA', 'PARTIDA', 'NIT','cantidad', 'peso neto',]
+
             # Data['peso neto'] *= Desgaste
-            df = Data[['Empresa', 'Nombre','Año', 'Mes', 'Dia', 'Código Partida', 'NIT del Importador (Análisis estadístico bajo modelo predictivo*)','Cantidad(es)', 'Peso en kilos netos',]]
-            df.columns = ['Empresa', 'Nombre','ANIO', 'MES', 'DIA', 'PARTIDA', 'NIT','cantidad', 'peso neto',]
             Split = SplitPartidas(DF=df,
                                   Year_Eval=Year_Eval,
                                   Partidas=Partidas,
@@ -240,6 +248,9 @@ def DataIEF(Year_Eval=Year_Eval, Partidas=Positions, Dimensiones=dimensions, Des
         pbar.update(1)
     pbar.close()
 
+    if len(S) == 0:
+        raise ValueError(f"Year {Year_Eval} does not have any entry in the input files")
+        
     S['cantidad'] = S['cantidad'].values.astype(float).astype(int)
     S['peso neto'] *= Desgaste
     S = FixWeigthUnits(S,Desgaste=Desgaste)
@@ -271,6 +282,7 @@ def ResumeInfo(Data):
         pbar.update(1)
     pbar.close()
     return Res
+
 def MetasIndividules(Info, Meta_dim1=Meta_dim1,Meta_dim2=Meta_dim2):
     """
     Calculate the total goals  for each company
@@ -467,13 +479,13 @@ def WriteMetas(Vals_ind, NameNIT, Meta_total, nameFile='Metas.xlsx', Path=Path):
         sheet.write(1,i, Meta_total[i])
 
     workbook.close()
-
-Info  = DataIEF()
-WriteIEF(Info)
-Goal, NameNIT = MetasIndividules(Info)
-Meta_t = MetasTotales(Info)
-
-WriteMetas(Goal, NameNIT,Meta_t)
-
-Resume = ResumeInfo(Info.copy())
-WriteIEF(Resume, nameFile='ResumenPlantillaInformacionIEF.xlsx')
+#
+# Info  = DataIEF()
+# WriteIEF(Info)
+# Goal, NameNIT = MetasIndividules(Info)
+# Meta_t = MetasTotales(Info)
+#
+# WriteMetas(Goal, NameNIT,Meta_t)
+#
+# Resume = ResumeInfo(Info.copy())
+# WriteIEF(Resume, nameFile='ResumenPlantillaInformacionIEF.xlsx')
